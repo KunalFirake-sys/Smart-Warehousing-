@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Warehouse Digital Twin - PBL Project</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    background: #111;
+    border-bottom: 2px solid #333;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  #topbar h1 {
+    font-size: 14px;
+    color: #00ff88;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  #topbar .sub {
+    font-size: 10px;
+    color: #777;
+    margin-top: 2px;
+  }
+  #topbar .right {
+    text-align: right;
+    font-size: 11px;
+  }
+  #ws-status {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #cc3333;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  #ws-status.online { background: #00ff88; }
+  #clock { color: #888; font-size: 11px; }
+
+  /* ── MAIN SPLIT ── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── LEFT: 3D TWIN ── */
+  #twin-panel {
+    width: 50%;
+    position: relative;
+    border-right: 2px solid #333;
+    background: #0d0d0d;
+  }
+  #c {
+    position: absolute;
+    inset: 0;
+  }
+  #twin-controls {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 10;
+  }
+  .btn {
+    background: #222;
+    border: 1px solid #444;
+    color: #aaa;
+    padding: 5px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .btn:hover { background: #333; color: #fff; border-color: #00ff88; }
+  #twin-hint {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 10px;
+    color: #666;
+    z-index: 10;
+    line-height: 1.6;
+  }
+  #tooltip3d {
+    position: absolute;
+    background: #111;
+    border: 1px solid #00ff88;
+    padding: 5px 8px;
+    font-size: 10px;
+    color: #00ff88;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    line-height: 1.6;
+  }
+
+  /* ── RIGHT: DASHBOARD ── */
+  #dashboard {
+    width: 50%;
+    overflow-y: auto;
+    padding: 12px;
+    background: #141414;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    padding: 10px 12px;
+  }
+  .card-title {
+    font-size: 10px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+
+  /* shelf grid */
+  .shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .shelf-cell {
+    border: 1px solid #333;
+    padding: 6px 4px;
+    text-align: center;
+    cursor: pointer;
+    min-height: 52px;
+    position: relative;
+    background: #181818;
+  }
+  .shelf-cell:hover { border-color: #555; }
+  .shelf-cell.has-items { border-color: #444; }
+  .cell-label {
+    font-size: 9px;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .cell-pips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    min-height: 18px;
+  }
+  .pip {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+  }
+  .pip.cubes      { background: #3a7bd5; border-radius: 1px; }
+  .pip.cylinders  { background: #d5913a; border-radius: 50%; }
+  .pip.chips      { background: #ffcc00; border-radius: 1px; }
+  .pip.bottle     { background: #44bb66; border-radius: 50%; }
+  .pip.cups       { background: #c8864a; border-radius: 50%; }
+  .pip.small_cups { background: #f0f0f0; border-radius: 50%; }
+  .pip\.tin\ can  { background: #aabbcc; border-radius: 50%; }
+  .cell-count {
+    font-size: 9px;
+    color: #666;
+    margin-top: 3px;
+  }
+
+  /* stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .stats-row-classes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .stat-box {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .stat-num {
+    font-size: 22px;
+    font-weight: bold;
+    line-height: 1;
+  }
+  .stat-num.sm { font-size: 16px; }
+  .stat-num.blue   { color: #3a7bd5; }
+  .stat-num.amber  { color: #d5913a; }
+  .stat-num.green  { color: #00ff88; }
+  .stat-num.yellow { color: #ffcc00; }
+  .stat-num.teal   { color: #44bb66; }
+  .stat-num.brown  { color: #c8864a; }
+  .stat-num.white  { color: #e8e8e8; }
+  .stat-num.silver { color: #aabbcc; }
+  .stat-label {
+    font-size: 9px;
+    color: #888;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .stat-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 3px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  /* capacity bar */
+  .cap-bar-wrap { margin-top: 4px; }
+  .cap-bar-bg {
+    height: 6px;
+    background: #2a2a2a;
+    border: 1px solid #333;
+    margin-top: 4px;
+  }
+  .cap-bar-fill {
+    height: 100%;
+    background: #00ff88;
+    transition: width 0.4s;
+  }
+  .cap-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #888;
+    margin-top: 3px;
+  }
+
+  /* log */
+  #log-box {
+    height: 110px;
+    overflow-y: auto;
+    background: #111;
+    border: 1px solid #2a2a2a;
+    padding: 6px;
+    font-size: 10px;
+    color: #555;
+    line-height: 1.7;
+  }
+  #log-box .log-line { color: #666; }
+  #log-box .log-line.new { color: #00cc66; }
+  #log-box .log-line.warn { color: #cc8800; }
+  #log-box .log-line.err { color: #cc3333; }
+
+  /* per-shelf table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  th {
+    text-align: left;
+    font-size: 9px;
+    color: #888;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 4px 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  td {
+    padding: 5px 6px;
+    border-bottom: 1px solid #222;
+    color: #999;
+    vertical-align: middle;
+  }
+  tr:hover td { background: #1a1a1a; }
+  .td-cubes      { color: #3a7bd5; font-weight: bold; }
+  .td-cylinders  { color: #d5913a; font-weight: bold; }
+  .td-chips      { color: #ffcc00; font-weight: bold; }
+  .td-bottle     { color: #44bb66; font-weight: bold; }
+  .td-cups       { color: #c8864a; font-weight: bold; }
+  .td-small_cups { color: #e8e8e8; font-weight: bold; }
+  .td-tin_can    { color: #aabbcc; font-weight: bold; }
+  .td-bar { width: 52px; }
+  .mini-bar-bg { height: 4px; background: #222; }
+  .mini-bar-fill { height: 100%; background: #00ff88; }
+  table { font-size: 10px; }
+  th, td { padding: 4px 4px; }
+
+  /* chart */
+  #chart-canvas {
+    width: 100%;
+    height: 120px;
+    background: #111;
+    border: 1px solid #2a2a2a;
+    display: block;
+  }
+
+  /* scrollbar */
+  #dashboard::-webkit-scrollbar { width: 4px; }
+  #dashboard::-webkit-scrollbar-track { background: #111; }
+  #dashboard::-webkit-scrollbar-thumb { background: #333; }
+
+  /* ── SENSOR PANEL ── */
+  .sensor-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .shelf-sensor-card {
+    background: #181818;
+    border: 1px solid #2a2a2a;
+    padding: 8px 8px 7px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: border-color 0.3s;
+  }
+  .shelf-sensor-card.occupied { border-color: #00ff88; }
+  .shelf-sensor-card.empty    { border-color: #2a2a2a; }
+  .shelf-sensor-title {
+    font-size: 9px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  /* IR */
+  .ir-row { display:flex; align-items:center; gap:5px; }
+  .ir-label { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:1px; flex:1; }
+  .ir-orb {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #1a1a1a; border: 1px solid #333;
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s, border-color 0.3s;
+  }
+  .ir-orb.clear {
+    background: #00ff88; border-color: #00ff88;
+    box-shadow: 0 0 5px 1px rgba(0,255,136,0.5), 0 0 10px 2px rgba(0,255,136,0.2);
+    animation: irPulse 2.4s ease-in-out infinite;
+  }
+  .ir-orb.blocked {
+    background: #cc3333; border-color: #cc3333;
+    box-shadow: 0 0 5px 1px rgba(204,51,51,0.55), 0 0 10px 2px rgba(204,51,51,0.2);
+    animation: irPulseBlocked 1.6s ease-in-out infinite;
+  }
+  @keyframes irPulse {
+    0%,100% { box-shadow: 0 0 5px 1px rgba(0,255,136,0.5),  0 0 10px 2px rgba(0,255,136,0.2); }
+    50%      { box-shadow: 0 0 8px 3px rgba(0,255,136,0.65), 0 0 16px 4px rgba(0,255,136,0.25); }
+  }
+  @keyframes irPulseBlocked {
+    0%,100% { box-shadow: 0 0 5px 1px rgba(204,51,51,0.55),  0 0 10px 2px rgba(204,51,51,0.2); }
+    50%      { box-shadow: 0 0 8px 3px rgba(204,51,51,0.7),   0 0 16px 4px rgba(204,51,51,0.25); }
+  }
+  .ir-status-text {
+    font-size: 9px; font-weight: bold; letter-spacing: 1px;
+    text-transform: uppercase; flex-shrink: 0;
+  }
+  .ir-status-text.clear   { color: #00cc66; }
+  .ir-status-text.blocked { color: #cc3333; }
+  /* Weight */
+  .weight-row { display:flex; align-items:flex-end; gap:4px; margin-top:1px; }
+  .weight-value {
+    font-size: 20px; font-weight: bold; line-height:1;
+    color: #d5913a; font-variant-numeric: tabular-nums;
+    transition: color 0.4s;
+  }
+  .weight-value.heavy { color: #cc3333; }
+  .weight-unit { font-size:9px; color:#777; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+  .weight-bar-bg {
+    height: 4px; background: #2a2a2a; border: 1px solid #333; margin-top:2px;
+  }
+  .weight-bar-fill {
+    height:100%; background: #d5913a;
+    transition: width 0.5s ease;
+  }
+  .weight-sublabel {
+    font-size:9px; color:#666; text-transform:uppercase; letter-spacing:1px;
+    margin-top:2px; display:flex; justify-content:space-between;
+  }
+  .sensor-badge {
+    position:absolute; top:5px; right:6px;
+    font-size:8px; color:#333; letter-spacing:1px; text-transform:uppercase;
+  }
+  .sensor-badge.live { color:#00cc66; }
+
+  /* ── WEIGHT VERIFICATION CARD ── */
+  #verify-card {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    padding: 10px 12px;
+  }
+  #verify-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  #verify-shelf-label {
+    font-size: 9px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  #verify-badge {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  #verify-badge.confirmed { background: #002a1a; color: #00ff88; border: 1px solid #00ff88; }
+  #verify-badge.mismatch  { background: #2a0000; color: #ff4444; border: 1px solid #ff4444; }
+  #verify-badge.pending   { background: #1a1600; color: #aa8800; border: 1px solid #555500; }
+  .vr-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #1e1e1e;
+    font-size: 10px;
+  }
+  .vr-row:last-child { border-bottom: none; }
+  .vr-label { color: #666; }
+  .vr-value { color: #aaa; font-family: 'Courier New', monospace; }
+  .vr-value.ok  { color: #00ff88; }
+  .vr-value.bad { color: #ff4444; }
+  #wt-breakdown { margin-top: 10px; border-top: 1px solid #2a2a2a; padding-top: 8px; }
+  #wt-breakdown-title { font-size: 9px; color: #777; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+  #wt-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  #wt-table th { color: #666; font-size: 8px; letter-spacing: 1px; padding: 3px 4px; border-bottom: 1px solid #2a2a2a; text-align: left; }
+  #wt-table td { padding: 3px 4px; border-bottom: 1px solid #1a1a1a; color: #777; font-family: 'Courier New', monospace; }
+  #wt-table td:first-child { color: #aaa; }
+  #wt-table tr.wt-summary td { color: #555; border-top: 1px solid #2a2a2a; border-bottom: none; padding-top: 5px; }
+  #wt-table tr.wt-summary td.ok  { color: #00ff88; }
+  #wt-table tr.wt-summary td.bad { color: #ff4444; }
+  .shelf-cell .cell-verify { position: absolute; bottom: 3px; right: 4px; font-size: 8px; font-weight: bold; }
+  .shelf-cell .cell-verify.confirmed { color: #00cc66; }
+  .shelf-cell .cell-verify.mismatch  { color: #cc3333; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div>
+    <h1>Warehouse Digital Twin</h1>
+    <div class="sub">PBL Smart Warehousing &nbsp;|&nbsp; YOLO v8 + Three.js + FastAPI</div>
+  </div>
+  <div class="right">
+    <span id="ws-status"></span><span id="ws-label">DISCONNECTED</span>
+    &nbsp;&nbsp;
+    <span id="clock">--:--:--</span>
+  </div>
+</div>
+
+<!-- MAIN SPLIT -->
+<div id="main">
+
+  <!-- LEFT: 3D TWIN -->
+  <div id="twin-panel">
+    <div id="c"></div>
+    <div id="tooltip3d"></div>
+    <div id="twin-hint">
+      drag = rotate &nbsp; scroll = zoom &nbsp; dbl = remove<br>
+      click = cube &nbsp; right-click = cylinder<br>
+      shift+click = chips &nbsp; ctrl+click = bottle<br>
+      alt+click = cups &nbsp; shift+right = small_cups<br>
+      ctrl+right = tin can
+    </div>
+    <div id="twin-controls">
+      <button class="btn" onclick="setView('front')">front</button>
+      <button class="btn" onclick="setView('iso')">iso</button>
+      <button class="btn" onclick="setView('top')">top</button>
+      <button class="btn" onclick="resetItems()">clear</button>
+      <button class="btn" onclick="fillRandom()">random</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: DASHBOARD -->
+  <div id="dashboard">
+
+    <!-- SENSOR READINGS: IR + WEIGHT (Shelves A, B, C) -->
+    <div class="card">
+      <div class="card-title">// shelf sensors &nbsp;<span style="font-size:9px;color:#555">hx711 · ir proximity</span></div>
+      <div class="sensor-panel">
+        <!-- SHELF A -->
+        <div class="shelf-sensor-card empty" id="sensor-card-A">
+          <span class="sensor-badge" id="sensor-badge-A">SIM</span>
+          <div class="shelf-sensor-title">Shelf A</div>
+          <div class="ir-row">
+            <div class="ir-label">IR</div>
+            <div class="ir-orb" id="ir-orb-A"></div>
+            <div class="ir-status-text" id="ir-text-A">—</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-value" id="wt-val-A">0.000</div>
+            <div class="weight-unit">kg</div>
+          </div>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" id="wt-bar-A" style="width:0%"></div></div>
+          <div class="weight-sublabel"><span>0g</span><span>5kg max</span></div>
+        </div>
+        <!-- SHELF B -->
+        <div class="shelf-sensor-card empty" id="sensor-card-B">
+          <span class="sensor-badge" id="sensor-badge-B">SIM</span>
+          <div class="shelf-sensor-title">Shelf B</div>
+          <div class="ir-row">
+            <div class="ir-label">IR</div>
+            <div class="ir-orb" id="ir-orb-B"></div>
+            <div class="ir-status-text" id="ir-text-B">—</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-value" id="wt-val-B">0.000</div>
+            <div class="weight-unit">kg</div>
+          </div>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" id="wt-bar-B" style="width:0%"></div></div>
+          <div class="weight-sublabel"><span>0g</span><span>5kg max</span></div>
+        </div>
+        <!-- SHELF C -->
+        <div class="shelf-sensor-card empty" id="sensor-card-C">
+          <span class="sensor-badge" id="sensor-badge-C">SIM</span>
+          <div class="shelf-sensor-title">Shelf C</div>
+          <div class="ir-row">
+            <div class="ir-label">IR</div>
+            <div class="ir-orb" id="ir-orb-C"></div>
+            <div class="ir-status-text" id="ir-text-C">—</div>
+          </div>
+          <div class="weight-row">
+            <div class="weight-value" id="wt-val-C">0.000</div>
+            <div class="weight-unit">kg</div>
+          </div>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" id="wt-bar-C" style="width:0%"></div></div>
+          <div class="weight-sublabel"><span>0g</span><span>5kg max</span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- WEIGHT CROSS-VERIFICATION CARD -->
+    <div class="card">
+      <div class="card-title">// weight cross-verification &nbsp;<span style="font-size:9px;color:#444">yolo ↔ hx711</span></div>
+      <div id="verify-card">
+        <div id="verify-status-row">
+          <span id="verify-shelf-label">awaiting sensor input</span>
+          <span id="verify-badge" class="pending">PENDING</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">Shelf</span>
+          <span class="vr-value" id="vr-shelf">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">YOLO detected</span>
+          <span class="vr-value" id="vr-count">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">YOLO expected weight</span>
+          <span class="vr-value" id="vr-expected">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">Sensor reading</span>
+          <span class="vr-value" id="vr-sensor">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">Delta</span>
+          <span class="vr-value" id="vr-delta">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">Tolerance ±</span>
+          <span class="vr-value" id="vr-tol">—</span>
+        </div>
+        <div class="vr-row">
+          <span class="vr-label">Checked at</span>
+          <span class="vr-value" id="vr-time">—</span>
+        </div>
+
+        <!-- per-class weight breakdown -->
+        <div id="wt-breakdown">
+          <div id="wt-breakdown-title">yolo weight breakdown</div>
+          <table id="wt-table">
+            <thead>
+              <tr><th>class</th><th>count</th><th>unit kg</th><th>subtotal</th></tr>
+            </thead>
+            <tbody id="wt-tbody">
+              <tr><td colspan="4" style="color:#333;padding:6px 4px">no sensor data yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="card">
+      <div class="card-title">// inventory summary</div>
+      <!-- PRIMARY: cubes + cylinders + small_cups always visible -->
+      <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-box" style="border-color:#3a7bd5;border-width:2px">
+          <div class="stat-num blue" id="d-cubes">0</div>
+          <div class="stat-label"><span class="stat-dot" style="background:#3a7bd5"></span>cubes</div>
+        </div>
+        <div class="stat-box" style="border-color:#d5913a;border-width:2px">
+          <div class="stat-num amber" id="d-cylinders">0</div>
+          <div class="stat-label"><span class="stat-dot" style="background:#d5913a"></span>cylinders</div>
+        </div>
+        <div class="stat-box" style="border-color:#e8e8e8;border-width:2px">
+          <div class="stat-num white" id="d-small_cups">0</div>
+          <div class="stat-label"><span class="stat-dot" style="background:#e8e8e8"></span>small cups</div>
+        </div>
+      </div>
+      <!-- Grand total + capacity -->
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <div class="stat-box" style="flex:1;text-align:center">
+          <div class="stat-num green" id="d-total">0</div>
+          <div class="stat-label">total items</div>
+        </div>
+        <div class="stat-box" style="flex:2">
+          <div class="cap-bar-label" style="margin-bottom:4px">
+            <span style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:1px">warehouse capacity</span>
+            <span style="font-size:9px;color:#888" id="d-pct">0%</span>
+          </div>
+          <div class="cap-bar-bg">
+            <div class="cap-bar-fill" id="d-capbar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <!-- COLLAPSIBLE: other classes -->
+      <div style="margin-top:8px;">
+        <div id="other-toggle" onclick="document.getElementById('other-classes').style.display=document.getElementById('other-classes').style.display==='none'?'grid':'none';this.querySelector('.tog-arrow').textContent=document.getElementById('other-classes').style.display==='none'?'▶':'▼'" style="cursor:pointer;font-size:9px;color:#777;text-transform:uppercase;letter-spacing:2px;padding:4px 0;border-top:1px solid #2a2a2a;user-select:none;display:flex;align-items:center;gap:6px">
+          <span class="tog-arrow">▶</span> other categories
+        </div>
+        <div id="other-classes" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">
+          <div class="stat-box">
+            <div class="stat-num sm yellow" id="d-chips">0</div>
+            <div class="stat-label"><span class="stat-dot" style="background:#ffcc00"></span>chips</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num sm teal" id="d-bottle">0</div>
+            <div class="stat-label"><span class="stat-dot" style="background:#44bb66"></span>bottle</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num sm brown" id="d-cups">0</div>
+            <div class="stat-label"><span class="stat-dot" style="background:#c8864a"></span>cups</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num sm silver" id="d-tin_can">0</div>
+            <div class="stat-label"><span class="stat-dot" style="background:#aabbcc"></span>tin can</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHELF MAP (collapsible) -->
+    <div class="card">
+      <div class="card-title" id="map-toggle" onclick="toggleSection('shelf-map-body','map-arrow')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;border-bottom:none;padding-bottom:0">
+        <span>// shelf map &nbsp;<span style="font-size:9px;color:#444">(click=add cube, right-click=cyl, dbl=remove)</span></span>
+        <span id="map-arrow" style="color:#888;font-size:10px;margin-left:8px">▶</span>
+      </div>
+      <div id="shelf-map-body" style="display:none;margin-top:10px">
+        <div class="shelf-grid" id="shelf-map"></div>
+      </div>
+    </div>
+
+    <!-- PER-SHELF TABLE (collapsible) -->
+    <div class="card">
+      <div class="card-title" id="table-toggle" onclick="toggleSection('shelf-table-body','table-arrow')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;border-bottom:none;padding-bottom:0">
+        <span>// per-shelf breakdown</span>
+        <span id="table-arrow" style="color:#888;font-size:10px;margin-left:8px">▶</span>
+      </div>
+      <div id="shelf-table-body" style="display:none;margin-top:10px">
+        <table>
+          <thead>
+            <tr><th>slot</th><th>cubes</th><th>cyls</th><th style="color:#ffcc00">chips</th><th style="color:#44bb66">btl</th><th style="color:#c8864a">cups</th><th style="color:#e8e8e8">s.cup</th><th style="color:#aabbcc">tin</th><th>tot</th><th class="td-bar">fill</th></tr>
+          </thead>
+          <tbody id="shelf-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BAR CHART (collapsible) -->
+    <div class="card">
+      <div class="card-title" id="chart-toggle" onclick="toggleSection('chart-body','chart-arrow')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;border-bottom:none;padding-bottom:0">
+        <span>// items per slot (bar chart)</span>
+        <span id="chart-arrow" style="color:#888;font-size:10px;margin-left:8px">▶</span>
+      </div>
+      <div id="chart-body" style="display:none;margin-top:10px">
+        <canvas id="chart-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- EVENT LOG (collapsible) -->
+    <div class="card">
+      <div class="card-title" id="log-toggle" onclick="toggleSection('log-body','log-arrow')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;border-bottom:none;padding-bottom:0">
+        <span>// event log</span>
+        <span id="log-arrow" style="color:#888;font-size:10px;margin-left:8px">▶</span>
+      </div>
+      <div id="log-body" style="display:none;margin-top:6px">
+        <div id="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</div><!-- /main -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+const MAX_PER_SLOT = 6;
+const CLASS_COLOR  = { cubes: 0x3a7bd5, cylinders: 0xd5913a };
+const TOTAL_SLOTS  = 7;
+const MAX_CAPACITY = TOTAL_SLOTS * MAX_PER_SLOT;
+const SLOT_LABELS  = ['A1','B1','B2','C1','C2','D1','D2'];
+
+// class → base type (exact names from data.yaml)
+const CLASS_BASE = {
+  cubes:      'cube',
+  cylinders:  'cylinder',
+  chips:      'cube',
+  bottle:     'cylinder',
+  cups:       'cylinder',
+  small_cups: 'cylinder',
+  'tin can':  'cylinder',
+};
+
+// ── NEW: visual config for each new class ──
+const CLASS_VISUAL = {
+  chips_packet: {
+    colorFn:    () => [0xffcc00, 0xff6633, 0x33ccff, 0xff33aa][Math.random() * 4 | 0],
+    metalness:  0.1,
+    roughness:  0.7,
+    // geometry multipliers for BoxGeometry
+    scaleX: 1.3,
+    scaleY: 0.75,
+    scaleZ: 0.5
+  },
+  bottle: {
+    color:        0x44bb66,
+    metalness:    0.1,
+    roughness:    0.2,
+    opacity:      0.72,
+    // cylinder multipliers
+    radiusScale:  0.55,
+    heightScale:  1.9
+  },
+  cup: {
+    color:        0xf0e0c8,
+    metalness:    0.05,
+    roughness:    0.8,
+    radiusScale:  0.85,
+    heightScale:  0.65
+  },
+  can: {
+    color:        0xaabbcc,
+    metalness:    0.85,
+    roughness:    0.2,
+    radiusScale:  0.75,
+    heightScale:  0.7
+  }
+};
+
+// =============================================================================
+// THREE.JS SCENE  (renders into left half only)
+// =============================================================================
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0d0d);
+
+const twinPanel = document.getElementById('twin-panel');
+const camera = new THREE.PerspectiveCamera(48, twinPanel.clientWidth / twinPanel.clientHeight, 0.1, 200);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(twinPanel.clientWidth, twinPanel.clientHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('c').appendChild(renderer.domElement);
+
+// lighting
+scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(4, 10, 8); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
+const fill = new THREE.PointLight(0xffffff, 0.6, 30);
+fill.position.set(-4, 6, 6); scene.add(fill);
+
+// room
+const wallMat  = new THREE.MeshStandardMaterial({ color:0x1a1a2e, roughness:0.9, metalness:0 });
+const floorMat = new THREE.MeshStandardMaterial({ color:0x111118, roughness:0.9, metalness:0 });
+
+const floorM = new THREE.Mesh(new THREE.PlaneGeometry(30,30), floorMat);
+floorM.rotation.x = -Math.PI/2; floorM.receiveShadow=true; scene.add(floorM);
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30,9), wallMat);
+backWall.position.set(0,4.5,-4); scene.add(backWall);
+const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(30,9), wallMat);
+leftWall.rotation.y=Math.PI/2; leftWall.position.set(-10,4.5,0); scene.add(leftWall);
+const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(30,9), wallMat);
+rightWall.rotation.y=-Math.PI/2; rightWall.position.set(10,4.5,0); scene.add(rightWall);
+
+// floor grid lines
+const gridMat = new THREE.MeshBasicMaterial({ color:0x1f1f1f });
+for(let i=-8;i<=8;i++){
+  const h=new THREE.Mesh(new THREE.PlaneGeometry(30,0.02),gridMat);
+  h.rotation.x=-Math.PI/2; h.position.set(0,0.001,i*1.5); scene.add(h);
+  const v=new THREE.Mesh(new THREE.PlaneGeometry(0.02,30),gridMat);
+  v.rotation.x=-Math.PI/2; v.position.set(i*1.5,0.001,0); scene.add(v);
+}
+
+// table
+const woodTop = new THREE.MeshStandardMaterial({ color:0x3a2010, roughness:0.8, metalness:0 });
+const woodLeg = new THREE.MeshStandardMaterial({ color:0x2a1808, roughness:0.8, metalness:0 });
+const TBL_W=6.0,TBL_D=2.0,TBL_H=0.09,TBL_Y=0.92;
+
+function mkbox(w,h,d,mat,x,y,z){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m;
+}
+
+mkbox(TBL_W,TBL_H,TBL_D,woodTop,0,TBL_Y,0);
+mkbox(TBL_W-0.1,0.07,TBL_D-0.1,woodLeg,0,TBL_Y-0.08,0);
+[[-TBL_W/2+0.08,-TBL_D/2+0.08],[-TBL_W/2+0.08,TBL_D/2-0.08],[TBL_W/2-0.08,-TBL_D/2+0.08],[TBL_W/2-0.08,TBL_D/2-0.08]].forEach(([lx,lz])=>{
+  const leg=new THREE.Mesh(new THREE.BoxGeometry(0.09,TBL_Y-TBL_H,0.09),woodLeg);
+  leg.position.set(lx,(TBL_Y-TBL_H)/2,lz); leg.castShadow=true; scene.add(leg);
+});
+
+// frame constants
+const TABLE_TOP=TBL_Y+TBL_H/2;
+const COLS=4, COL_SHELF_COUNTS=[1,2,2,2], COL_SPACING=1.0;
+const SHELF_W=0.9,SHELF_D=0.80,SHELF_H=0.04,POST_SIZE=0.07;
+const ROW_HEIGHT=1.3,POST_HEIGHT=2*ROW_HEIGHT+0.7;
+const TOTAL_W=(COLS-1)*COL_SPACING+SHELF_W;
+const originX=-TOTAL_W/2+SHELF_W/2;
+const postXs=[];
+for(let c=0;c<COLS;c++){const cx=originX+c*COL_SPACING;if(c===0)postXs.push(cx-SHELF_W/2);postXs.push(cx+SHELF_W/2);}
+const postZFront=-SHELF_D/2,postZBack=SHELF_D/2;
+
+const frameMat=new THREE.MeshStandardMaterial({color:0x888e94,metalness:0.8,roughness:0.2});
+const baseMat =new THREE.MeshStandardMaterial({color:0x202020,metalness:0.8,roughness:0.4});
+const shelfMat=new THREE.MeshStandardMaterial({color:0x2a1a08,roughness:0.95,metalness:0});
+const bktMat  =new THREE.MeshStandardMaterial({color:0x888e94,metalness:0.75,roughness:0.3});
+
+const baseW=postXs[COLS]-postXs[0]+POST_SIZE,baseCX=(postXs[0]+postXs[COLS])/2;
+mkbox(baseW,0.07,SHELF_D+0.25,baseMat,baseCX,TABLE_TOP+0.04,0);
+const postBaseY=TABLE_TOP+0.07,postCY=postBaseY+POST_HEIGHT/2;
+postXs.forEach(px=>{mkbox(POST_SIZE,POST_HEIGHT,POST_SIZE,frameMat,px,postCY,postZFront);mkbox(POST_SIZE,POST_HEIGHT,POST_SIZE,frameMat,px,postCY,postZBack);});
+const topY=postBaseY+POST_HEIGHT,railW=postXs[COLS]-postXs[0]+POST_SIZE,railCX=(postXs[0]+postXs[COLS])/2;
+mkbox(railW,POST_SIZE,POST_SIZE,frameMat,railCX,topY,postZFront);
+mkbox(railW,POST_SIZE,POST_SIZE,frameMat,railCX,topY,postZBack);
+postXs.forEach(px=>mkbox(POST_SIZE,POST_SIZE,SHELF_D,frameMat,px,topY,0));
+
+const BKT_T=0.016,BKT_VERT_H=0.11,BKT_LEDGE=0.09,BKT_LEN=SHELF_D+POST_SIZE;
+
+const slotState   =[];
+const slotMeshPool=[];
+const slotInfo    =[];
+
+for(let col=0;col<COLS;col++){
+  slotState.push([]); slotMeshPool.push([]); slotInfo.push([]);
+  const leftPX=postXs[col],rightPX=postXs[col+1];
+  const leftInner=leftPX+POST_SIZE/2,rightInner=rightPX-POST_SIZE/2;
+  const bayCX=(leftPX+rightPX)/2;
+  for(let row=0;row<COL_SHELF_COUNTS[col];row++){
+    slotState[col].push([]); slotMeshPool[col].push([]);
+    const shelfY=postBaseY+POST_HEIGHT*(row+1)/3;
+    const trayW=rightInner-leftInner,trayD=SHELF_D-POST_SIZE;
+    mkbox(BKT_T,BKT_VERT_H,BKT_LEN,bktMat,leftInner+BKT_T/2,shelfY-BKT_VERT_H/2+BKT_T,0);
+    mkbox(BKT_LEDGE,BKT_T,BKT_LEN,bktMat,leftInner+BKT_T+BKT_LEDGE/2,shelfY-BKT_T/2,0);
+    mkbox(BKT_T,BKT_VERT_H,BKT_LEN,bktMat,rightInner-BKT_T/2,shelfY-BKT_VERT_H/2+BKT_T,0);
+    mkbox(BKT_LEDGE,BKT_T,BKT_LEN,bktMat,rightInner-BKT_T-BKT_LEDGE/2,shelfY-BKT_T/2,0);
+    mkbox(trayW,SHELF_H,trayD,shelfMat,bayCX,shelfY+SHELF_H/2,0);
+    slotInfo[col].push({bayCX,shelfY,trayW,trayD});
+  }
+}
+
+// =============================================================================
+// makeMesh() — cube, cylinder unchanged; new classes get rich visuals
+// =============================================================================
+function makeMesh(cls, trayW, trayD) {
+  const baseSize = Math.min(trayW / 6.5, trayD) * 0.85;
+
+  // ── chips ────────────────────────────────────────────────────
+  if (cls === 'chips') {
+    const group = new THREE.Group();
+
+    const schemes = [
+      { body: 0xdd1111, stripe: 0xffdd00, foil: 0xffee88 }, // red/yellow — Lays Classic
+      { body: 0xff6200, stripe: 0xffffff, foil: 0xffe0bb }, // orange/white — Kurkure
+      { body: 0x1144bb, stripe: 0xffcc00, foil: 0xaaccff }, // blue/gold — Lays Blue
+      { body: 0x006622, stripe: 0xffdd00, foil: 0x88ddaa }, // green/yellow — Pringles-ish
+      { body: 0x880000, stripe: 0xffffff, foil: 0xffaaaa }, // dark red/white
+    ];
+    const sc = schemes[Math.floor(Math.random() * schemes.length)];
+
+    // Bag proportions — landscape-ish rect, fat depth (air-puffed)
+    const W = baseSize * 2.6;   // width  (left-right)
+    const H = baseSize * 3.0;   // height (tall bag)
+    const D = baseSize * 1.1;   // depth  (puffy, not flat)
+
+    // ── main bag body: subdivided box, bulged outward in XZ centre ──
+    const SEG = 5;
+    const geo = new THREE.BoxGeometry(W, H, D, SEG, SEG * 2, SEG);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const ny = pos.getY(i) / (H / 2); // –1 (bottom) to +1 (top)
+      // Bag bulges most in the middle third, pinches at top seal (top 18%) and bottom seal (bottom 12%)
+      const topPinch = ny >  0.70 ? Math.pow(1 - (ny - 0.70) / 0.30, 0.6) : 1.0;
+      const botPinch = ny < -0.78 ? Math.pow(1 - (-ny - 0.78) / 0.22, 0.7) : 1.0;
+      const bulge    = 1.0 + 0.18 * Math.max(0, 1 - ny * ny * 2.2);  // gentle outward puff
+      const s = bulge * topPinch * botPinch;
+      pos.setX(i, pos.getX(i) * s);
+      pos.setZ(i, pos.getZ(i) * s);
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+
+    // Foil-like material — shiny metallic with body colour tint
+    const bagMat = new THREE.MeshStandardMaterial({
+      color: sc.body, roughness: 0.28, metalness: 0.62
+    });
+    const bag = new THREE.Mesh(geo, bagMat);
+    bag.castShadow = true; bag.receiveShadow = true;
+    group.add(bag);
+
+    // ── brand colour band across the front face (wide centre stripe) ──
+    const stripeH = H * 0.30;
+    const stripeGeo = new THREE.BoxGeometry(W * 0.98, stripeH, D * 1.012);
+    const stripeMat = new THREE.MeshStandardMaterial({
+      color: sc.stripe, roughness: 0.45, metalness: 0.3
+    });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.y = H * 0.05;  // slightly above centre
+    group.add(stripe);
+
+    // ── top crimped seal — flat narrow bar, slightly narrower than bag ──
+    const sealTopGeo = new THREE.BoxGeometry(W * 0.78, H * 0.09, D * 0.22);
+    const sealMat = new THREE.MeshStandardMaterial({
+      color: sc.foil, roughness: 0.55, metalness: 0.5
+    });
+    const sealTop = new THREE.Mesh(sealTopGeo, sealMat);
+    sealTop.position.y = H * 0.52;
+    group.add(sealTop);
+
+    // ── bottom crimped seal ──
+    const sealBotGeo = new THREE.BoxGeometry(W * 0.82, H * 0.07, D * 0.20);
+    const sealBot = new THREE.Mesh(sealBotGeo, sealMat);
+    sealBot.position.y = -H * 0.52;
+    group.add(sealBot);
+
+    // ── tear-notch bump at top-right corner ──
+    const notchGeo = new THREE.BoxGeometry(W * 0.06, H * 0.04, D * 0.25);
+    const notch = new THREE.Mesh(notchGeo, sealMat);
+    notch.position.set(W * 0.38, H * 0.51, 0);
+    group.add(notch);
+
+    // Slight random lean — bags slump a little on shelves
+    group.rotation.z = (Math.random() - 0.5) * 0.15;
+    group.rotation.y = (Math.random() - 0.5) * 0.15;
+
+    // Shift all children up so the bag's bottom sits at local y=0
+    const _chipsH = H * 1.06;
+    group.children.forEach(c => { c.position.y += _chipsH / 2; });
+    group.userData.isBottomAligned = true;
+
+    scene.add(group);
+    group.castShadow = true; group.receiveShadow = true;
+    return group;
+  }
+
+  // ── bottle ───────────────────────────────────────────────────
+  // Large PET bottle (Frooti/juice style) — significantly bigger
+  if (cls === 'bottle') {
+    const group = new THREE.Group();
+
+    const bottleSchemes = [
+      { body: 0xd4a017, cap: 0xf5c518, label: 0xe8b820 }, // amber/yellow — Frooti
+      { body: 0x55cc77, cap: 0xeeeeee, label: 0x33aa55 }, // green/white — Sprite
+      { body: 0xb0d8f8, cap: 0x2255cc, label: 0x88bbee }, // clear-blue/blue — water
+      { body: 0xdd4400, cap: 0xdd4400, label: 0xff5511 }, // red — juice
+    ];
+    const sc = bottleSchemes[Math.floor(Math.random() * bottleSchemes.length)];
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: sc.body, roughness: 0.05, metalness: 0.0,
+      transparent: true, opacity: 0.84
+    });
+    const capMat = new THREE.MeshStandardMaterial({
+      color: sc.cap, roughness: 0.3, metalness: 0.08
+    });
+    const labelMat = new THREE.MeshStandardMaterial({
+      color: sc.label, roughness: 0.7, metalness: 0.0
+    });
+
+    // Much larger bottle dimensions
+    const rBase   = baseSize * 0.58;
+    const rTop    = baseSize * 0.50;
+    const rNeck   = baseSize * 0.24;
+    const hBody   = baseSize * 3.4;
+    const hShould = baseSize * 0.52;
+    const hNeck   = baseSize * 0.70;
+    const hCap    = baseSize * 0.40;
+
+    // Main body
+    const bodyGeo = new THREE.CylinderGeometry(rTop, rBase, hBody, 22);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true; body.receiveShadow = true;
+    group.add(body);
+
+    // Shoulder taper
+    const shoulderGeo = new THREE.CylinderGeometry(rNeck, rTop, hShould, 22);
+    const shoulder = new THREE.Mesh(shoulderGeo, bodyMat);
+    shoulder.position.y = hBody / 2 + hShould / 2;
+    group.add(shoulder);
+
+    // Neck
+    const neckGeo = new THREE.CylinderGeometry(rNeck, rNeck, hNeck, 18);
+    const neck = new THREE.Mesh(neckGeo, bodyMat);
+    neck.position.y = hBody / 2 + hShould + hNeck / 2;
+    group.add(neck);
+
+    // Cap
+    const capGeo = new THREE.CylinderGeometry(rNeck * 1.12, rNeck * 1.05, hCap, 18);
+    const cap = new THREE.Mesh(capGeo, capMat);
+    cap.position.y = hBody / 2 + hShould + hNeck + hCap / 2;
+    group.add(cap);
+
+    // Label band
+    const labelGeo = new THREE.CylinderGeometry(rBase * 1.012, rBase * 1.012, hBody * 0.58, 22);
+    const label = new THREE.Mesh(labelGeo, labelMat);
+    label.position.y = -hBody * 0.08;
+    group.add(label);
+
+    scene.add(group);
+    group.castShadow = true; group.receiveShadow = true;
+
+    // Shift all children up so the bottle's bottom sits at local y=0
+    // Body is centered at 0, so its bottom is at -hBody/2; shift by exactly that.
+    const _bottleH = hBody / 2;
+    group.children.forEach(c => { c.position.y += _bottleH; });
+    group.userData.isBottomAligned = true;
+
+    return group;
+  }
+
+  // ── cups ─────────────────────────────────────────────────────
+  // Large kraft paper cup — significantly bigger, with corrugation sleeve
+  if (cls === 'cups') {
+    const group = new THREE.Group();
+
+    const cupColors = [0xc8864a, 0xd4956a, 0xb87040];
+    const cupColor  = cupColors[Math.floor(Math.random() * cupColors.length)];
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: cupColor, roughness: 0.92, metalness: 0.0
+    });
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x6b3e1e, roughness: 0.8, metalness: 0.0
+    });
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0x7a4e2d, roughness: 0.9, metalness: 0.0
+    });
+    const sleeveMat = new THREE.MeshStandardMaterial({
+      color: 0x8b5a2b, roughness: 0.97, metalness: 0.0,
+      transparent: true, opacity: 0.55
+    });
+
+    // Proper tall paper cup proportions — not a bucket
+    const rTop  = baseSize * 0.72;   // was 1.10 — way too wide
+    const rBot  = baseSize * 0.52;   // narrower base
+    const hBody = baseSize * 1.80;   // tall but not absurdly so
+
+    // Body (open top)
+    const bodyGeo = new THREE.CylinderGeometry(rTop, rBot, hBody, 28, 4, true);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true; body.receiveShadow = true;
+    group.add(body);
+
+    // Bottom disc
+    const botGeo = new THREE.CircleGeometry(rBot * 0.97, 28);
+    const bot = new THREE.Mesh(botGeo, baseMat);
+    bot.rotation.x = -Math.PI / 2;
+    bot.position.y = -hBody / 2 + 0.002;
+    group.add(bot);
+
+    // Thin lip at top — just a slightly thickened top edge, NOT a torus ring
+    const lipGeo = new THREE.CylinderGeometry(rTop * 1.012, rTop, hBody * 0.03, 28);
+    const lipMat = new THREE.MeshStandardMaterial({ color: 0x7a5030, roughness: 0.85, metalness: 0 });
+    const lip = new THREE.Mesh(lipGeo, lipMat);
+    lip.position.y = hBody / 2 + hBody * 0.015;
+    group.add(lip);
+
+    // Corrugated sleeve (covers lower 65% of cup) — subtle, no ridge rings
+    const sleeveGeo = new THREE.CylinderGeometry(rTop * 1.018, rBot * 1.05, hBody * 0.62, 28, 1, true);
+    const sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
+    sleeve.position.y = -hBody * 0.12;
+    group.add(sleeve);
+
+    scene.add(group);
+    group.castShadow = true; group.receiveShadow = true;
+
+    // Shift all children up so the cup's bottom sits at local y=0
+    const _cupH = hBody / 2;
+    group.children.forEach(c => { c.position.y += _cupH; });
+    group.userData.isBottomAligned = true;
+
+    return group;
+  }
+
+  // ── tin can ──────────────────────────────────────────────────
+  // Tall energy drink / tin can — matches data.yaml 'tin can'
+  if (cls === 'tin can') {
+    const group = new THREE.Group();
+
+    const canSchemes = [
+      { body: 0x111111, label: 0xcc0000 }, // black/red — Hell energy
+      { body: 0x1133aa, label: 0x4488ff }, // blue — Red Bull
+      { body: 0x003300, label: 0x00cc00 }, // dark green — Monster
+      { body: 0xcc5500, label: 0xff8800 }, // orange
+      { body: 0x550077, label: 0xaa33ff }, // purple
+    ];
+    const sc = canSchemes[Math.floor(Math.random() * canSchemes.length)];
+
+    const alumMat = new THREE.MeshStandardMaterial({
+      color: 0xcccccc, roughness: 0.12, metalness: 0.96
+    });
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: sc.body, roughness: 0.18, metalness: 0.80
+    });
+    const labelMat = new THREE.MeshStandardMaterial({
+      color: sc.label, roughness: 0.40, metalness: 0.35
+    });
+    const topMat = new THREE.MeshStandardMaterial({
+      color: 0xaaaaaa, roughness: 0.15, metalness: 0.96
+    });
+    const tabMat = new THREE.MeshStandardMaterial({
+      color: 0x999999, roughness: 0.25, metalness: 0.92
+    });
+
+    const r      = baseSize * 0.62;
+    const hBody  = baseSize * 2.80;
+    const hTaper = baseSize * 0.32;
+    const hLid   = baseSize * 0.10;
+
+    const bodyGeo = new THREE.CylinderGeometry(r, r, hBody, 32);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true; body.receiveShadow = true;
+    group.add(body);
+
+    const labelGeo = new THREE.CylinderGeometry(r * 1.006, r * 1.006, hBody * 0.64, 32);
+    const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+    labelMesh.position.y = -hBody * 0.03;
+    group.add(labelMesh);
+
+    const taperGeo = new THREE.CylinderGeometry(r * 0.60, r, hTaper, 32);
+    const taper = new THREE.Mesh(taperGeo, alumMat);
+    taper.position.y = hBody / 2 + hTaper / 2;
+    group.add(taper);
+
+    const lidGeo = new THREE.CylinderGeometry(r * 0.60, r * 0.60, hLid, 32);
+    const lid = new THREE.Mesh(lidGeo, topMat);
+    lid.position.y = hBody / 2 + hTaper + hLid / 2;
+    group.add(lid);
+
+    const tabGeo = new THREE.TorusGeometry(r * 0.20, baseSize * 0.038, 6, 18);
+    const tab = new THREE.Mesh(tabGeo, tabMat);
+    tab.position.set(r * 0.22, hBody / 2 + hTaper + hLid + 0.01, 0);
+    tab.rotation.x = Math.PI / 2;
+    group.add(tab);
+
+    const leverGeo = new THREE.BoxGeometry(r * 0.28, baseSize * 0.035, r * 0.48);
+    const lever = new THREE.Mesh(leverGeo, tabMat);
+    lever.position.set(r * 0.10, hBody / 2 + hTaper + hLid + 0.01, r * 0.10);
+    group.add(lever);
+
+    const botTaperGeo = new THREE.CylinderGeometry(r, r * 0.86, hTaper * 0.55, 32);
+    const botTaper = new THREE.Mesh(botTaperGeo, alumMat);
+    botTaper.position.y = -hBody / 2 - hTaper * 0.275;
+    group.add(botTaper);
+
+    scene.add(group);
+    group.castShadow = true; group.receiveShadow = true;
+
+    const _canH = hBody / 2 + hTaper * 0.275; // shift so true bottom is at y=0
+    group.children.forEach(c => { c.position.y += _canH; });
+    group.userData.isBottomAligned = true;
+
+    return group;
+  }
+
+  // ── small_cups ───────────────────────────────────────────────
+  // Accurate small white disposable cup from reference photos:
+  //   - Classic short frustum: top clearly wider than base (~30% more)
+  //   - Height roughly equal to top diameter
+  //   - Prominent thick rolled rim/lip at top
+  //   - Smooth matte-white surface (no sleeve)
+  //   - Flat base, open top with shallow interior visible
+  if (cls === 'small_cups') {
+    const group = new THREE.Group();
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0xf9f9f9, roughness: 0.80, metalness: 0.01
+    });
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0xe8e8e8, roughness: 0.65, metalness: 0.03
+    });
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0xeeeeee, roughness: 0.88, metalness: 0.0
+    });
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0xe4e4e4, roughness: 0.90, metalness: 0.0
+    });
+
+    // Clear taper matching photos: top ~30% wider than base
+    const rTop  = baseSize * 0.92;
+    const rBot  = baseSize * 0.60;
+    const hBody = baseSize * 1.10;
+
+    // Open-top frustum body
+    const bodyGeo = new THREE.CylinderGeometry(rTop, rBot, hBody, 32, 3, true);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.castShadow = true; body.receiveShadow = true;
+    group.add(body);
+
+    // Flat base disc
+    const botGeo = new THREE.CircleGeometry(rBot * 0.97, 32);
+    const bot = new THREE.Mesh(botGeo, baseMat);
+    bot.rotation.x = -Math.PI / 2;
+    bot.position.y = -hBody / 2 + 0.001;
+    group.add(bot);
+
+    // Shallow visible interior floor
+    const innerGeo = new THREE.CircleGeometry(rTop * 0.86, 32);
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.rotation.x = -Math.PI / 2;
+    inner.position.y = hBody / 2 - baseSize * 0.08;
+    group.add(inner);
+
+    scene.add(group);
+    group.castShadow = true; group.receiveShadow = true;
+
+    // Shift so true bottom sits at y=0
+    group.children.forEach(c => { c.position.y += hBody / 2; });
+    group.userData.isBottomAligned = true;
+
+    return group;
+  }
+
+  // ── cubes = BoxGeometry (blue) / cylinders = CylinderGeometry (amber) ──
+  const mat = new THREE.MeshStandardMaterial({
+    color:     CLASS_COLOR[cls] ?? 0xffffff,
+    roughness: cls === 'cubes' ? 0.5 : 0.4,
+    metalness: 0.15,
+  });
+  const size = baseSize;
+  const geo  = cls === 'cubes'
+    ? new THREE.BoxGeometry(size, size, size)
+    : new THREE.CylinderGeometry(size * 0.46, size * 0.46, size * 1.1, 20);
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true; scene.add(m);
+  return m;
+}
+
+// =============================================================================
+// MODIFIED reflowSlot() — swaps geometry when class changes in a pool slot
+// =============================================================================
+function reflowSlot(col, row) {
+  const items = slotState[col][row], pool = slotMeshPool[col][row];
+  const {bayCX, shelfY, trayW, trayD} = slotInfo[col][row];
+  const n = items.length;
+  const itemSize = Math.min(trayW / 6.5, trayD) * 0.85;
+  const gap = 0.02;
+  const totalSpan = n * itemSize + (n - 1) * gap;
+  const startX = bayCX - totalSpan / 2 + itemSize / 2;
+  const itemY = shelfY + SHELF_H + 0.01 + itemSize / 2;
+
+  // trim excess meshes
+  while (pool.length > n) {
+    const old = pool.pop();
+    scene.remove(old);
+    if (old.isGroup) {
+      old.children.forEach(c => { c.geometry && c.geometry.dispose(); c.material && c.material.dispose(); });
+    } else {
+      old.geometry && old.geometry.dispose();
+      old.material && old.material.dispose();
+    }
+  }
+
+  // grow pool, tagging each mesh with its class
+  while (pool.length < n) {
+    const idx = pool.length;
+    const m = makeMesh(items[idx], trayW, trayD);
+    m.userData.cls = items[idx];
+    pool.push(m);
+  }
+
+  // reflow positions — swap geometry if class changed
+  for (let i = 0; i < n; i++) {
+    // if class changed rebuild
+    if (pool[i].userData.cls !== items[i]) {
+      const old = pool[i];
+      scene.remove(old);
+      if (old.isGroup) {
+        old.children.forEach(c => { c.geometry && c.geometry.dispose(); c.material && c.material.dispose(); });
+      } else {
+        old.geometry && old.geometry.dispose();
+        old.material && old.material.dispose();
+      }
+      pool[i] = makeMesh(items[i], trayW, trayD);
+      pool[i].userData.cls = items[i];
+    }
+
+    const m = pool[i];
+    // colour fix for plain cubes/cylinders (Groups handle their own materials)
+    if (!m.isGroup && (items[i] === 'cubes' || items[i] === 'cylinders')) {
+      m.material.color.setHex(CLASS_COLOR[items[i]] ?? 0xffffff);
+      m.material.needsUpdate = true;
+    }
+
+    // Bottom-aligned groups (bottle, cup, can, chips_packet) have their local y=0
+    // at the base, so place them at the shelf surface. Cubes/cylinders are centered,
+    // so keep the original itemY (shelf surface + half their height).
+    const posY = m.userData.isBottomAligned
+      ? (shelfY + SHELF_H + 0.01)
+      : itemY;
+
+    m.position.set(startX + i * (itemSize + gap), posY, 0);
+    m.scale.setScalar(0.01);
+    let t = 0; const tgt = m;
+    const grow = () => { t += 0.18; tgt.scale.setScalar(Math.min(1, t)); if (t < 1) requestAnimationFrame(grow); };
+    grow();
+  }
+}
+
+function addItem(col,row,cls){
+  if(slotState[col][row].length>=MAX_PER_SLOT)return;
+  slotState[col][row].push(cls);
+  reflowSlot(col,row); updateUI();
+  addLog(`added ${cls} to slot ${SLOT_LABELS[flatIdx(col,row)]}`,'new');
+}
+
+function removeLast(col,row){
+  if(!slotState[col][row].length)return;
+  const cls=slotState[col][row].pop();
+  reflowSlot(col,row); updateUI();
+  addLog(`removed ${cls} from slot ${SLOT_LABELS[flatIdx(col,row)]}`,'warn');
+}
+
+function setSlot(col,row,items){
+  const pool=slotMeshPool[col][row];
+  while(pool.length){
+    const m=pool.pop();
+    scene.remove(m);
+    if(m.isGroup){
+      m.children.forEach(c=>{c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();});
+    } else {
+      m.geometry&&m.geometry.dispose();
+      m.material&&m.material.dispose();
+    }
+  }
+  slotState[col][row]=[...items].slice(0,MAX_PER_SLOT);
+  reflowSlot(col,row); updateUI();
+}
+
+function flatIdx(col,row){
+  let idx=0;
+  for(let c=0;c<col;c++)idx+=COL_SHELF_COUNTS[c];
+  return idx+row;
+}
+
+// hit planes
+const hitPlanes=[];
+for(let col=0;col<COLS;col++){
+  hitPlanes.push([]);
+  for(let row=0;row<COL_SHELF_COUNTS[col];row++){
+    const {bayCX,shelfY,trayW,trayD}=slotInfo[col][row];
+    const geo=new THREE.BoxGeometry(trayW,0.35,trayD);
+    const mat=new THREE.MeshBasicMaterial({visible:false});
+    const plane=new THREE.Mesh(geo,mat);
+    plane.position.set(bayCX,shelfY+0.2,0);
+    plane.userData={col,row};
+    scene.add(plane); hitPlanes[col].push(plane);
+  }
+}
+
+function allHitTargets(){
+  const out=[];
+  for(let c=0;c<COLS;c++)for(let r=0;r<COL_SHELF_COUNTS[c];r++){slotMeshPool[c][r].forEach(m=>out.push(m));out.push(hitPlanes[c][r]);}
+  return out;
+}
+
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+const tooltip3d=document.getElementById('tooltip3d');
+
+function raycast(ex,ey){
+  const rect=twinPanel.getBoundingClientRect();
+  mouse.set(((ex-rect.left)/rect.width)*2-1,-(( ey-rect.top)/rect.height)*2+1);
+  raycaster.setFromCamera(mouse,camera);
+  return raycaster.intersectObjects(allHitTargets());
+}
+
+// resolve which class to add based on mouse button + modifier keys
+// cubes=click, cylinders=right-click, chips=shift+click,
+// bottle=ctrl+click, cups=alt+click, small_cups=shift+right, tin can=ctrl+right
+function resolveClass(e, isRightClick) {
+  if(isRightClick && e.shiftKey)           return 'small_cups';
+  if(isRightClick && (e.ctrlKey||e.metaKey)) return 'tin can';
+  if(isRightClick)                         return 'cylinders';
+  if(e.shiftKey)                           return 'chips';
+  if(e.ctrlKey || e.metaKey)              return 'bottle';
+  if(e.altKey)                             return 'cups';
+  return 'cubes';
+}
+
+let lastClick=0;
+renderer.domElement.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const h=raycast(e.clientX,e.clientY);
+  if(h.length){const {col,row}=h[0].object.userData;addItem(col,row,resolveClass(e,true));}
+});
+renderer.domElement.addEventListener('click',e=>{
+  const now=Date.now(),dbl=now-lastClick<300;lastClick=now;
+  const h=raycast(e.clientX,e.clientY);
+  if(h.length){const {col,row}=h[0].object.userData;dbl?removeLast(col,row):addItem(col,row,resolveClass(e,false));}
+});
+renderer.domElement.addEventListener('mousedown',e=>{
+  if(e.button===1){e.preventDefault();const h=raycast(e.clientX,e.clientY);if(h.length){const {col,row}=h[0].object.userData;removeLast(col,row);}}
+});
+renderer.domElement.addEventListener('mousemove',e=>{
+  const h=raycast(e.clientX,e.clientY);
+  if(h.length){
+    const {col,row}=h[0].object.userData;
+    const items=slotState[col][row];
+    tooltip3d.style.cssText=`display:block;left:${e.clientX-twinPanel.getBoundingClientRect().left+12}px;top:${e.clientY-twinPanel.getBoundingClientRect().top-10}px`;
+    tooltip3d.innerHTML=`slot ${SLOT_LABELS[flatIdx(col,row)]} [${items.length}/${MAX_PER_SLOT}]<br>${items.join(', ')||'empty'}`;
+  } else { tooltip3d.style.display='none'; }
+});
+
+// camera orbit
+let isDragging=false,prev={x:0,y:0};
+let theta=0.5,phi=0.5,radius=11,tT=0.5,tP=0.5,tR=11;
+const LOOK=new THREE.Vector3(0,2,0);
+renderer.domElement.addEventListener('mousedown',e=>{isDragging=true;prev={x:e.clientX,y:e.clientY};});
+window.addEventListener('mouseup',()=>isDragging=false);
+renderer.domElement.addEventListener('mousemove',e=>{
+  if(!isDragging)return;
+  tT-=(e.clientX-prev.x)*0.007;
+  tP=Math.max(0.06,Math.min(1.3,tP-(e.clientY-prev.y)*0.007));
+  prev={x:e.clientX,y:e.clientY};
+});
+renderer.domElement.addEventListener('wheel',e=>{tR=Math.max(4,Math.min(22,tR+e.deltaY*0.01));});
+function setView(v){
+  if(v==='front'){tT=0;tP=0.28;tR=10;}
+  if(v==='iso')  {tT=0.5;tP=0.5;tR=11;}
+  if(v==='top')  {tT=0;tP=1.25;tR=12;}
+}
+
+(function animate(){
+  requestAnimationFrame(animate);
+  theta+=(tT-theta)*0.09; phi+=(tP-phi)*0.09; radius+=(tR-radius)*0.09;
+  camera.position.set(radius*Math.sin(theta)*Math.cos(phi),radius*Math.sin(phi)+1,radius*Math.cos(theta)*Math.cos(phi));
+  camera.lookAt(LOOK);
+  renderer.render(scene,camera);
+})();
+
+window.addEventListener('resize',()=>{
+  camera.aspect=twinPanel.clientWidth/twinPanel.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(twinPanel.clientWidth,twinPanel.clientHeight);
+});
+
+// =============================================================================
+// DASHBOARD UI
+// =============================================================================
+
+// build shelf map
+const mapEl=document.getElementById('shelf-map');
+let allSlotEls=[];
+'ABCD'.split('').forEach((lbl,col)=>{
+  for(let row=COL_SHELF_COUNTS[col]-1;row>=0;row--){
+    const cell=document.createElement('div');
+    cell.className='shelf-cell';
+    cell.dataset.col=col; cell.dataset.row=row;
+    const idx=flatIdx(col,row);
+    const shelfLetter=['A','B','C','D'][col];
+    cell.id=`smap-cell-${shelfLetter}`;
+    cell.innerHTML=`<div class="cell-label">${SLOT_LABELS[idx]}</div><div class="cell-pips" id="pips-${col}-${row}"></div><div class="cell-count" id="cnt-${col}-${row}">0/${MAX_PER_SLOT}</div><span class="cell-verify" id="cv-${col}-${row}"></span>`;
+    cell.onclick=e=>{ if(e.detail>1)return; addItem(col,row,resolveClass(e,false)); };
+    cell.oncontextmenu=e=>{e.preventDefault();addItem(col,row,resolveClass(e,true));};
+    cell.ondblclick=()=>removeLast(col,row);
+    mapEl.appendChild(cell);
+    allSlotEls.push(cell);
+  }
+  // empty filler for col A (only 1 shelf)
+  if(COL_SHELF_COUNTS[col]===1){
+    const filler=document.createElement('div');
+    filler.className='shelf-cell';
+    filler.style.cssText='background:#111;border-color:#1a1a1a;cursor:default;';
+    filler.innerHTML='<div class="cell-label" style="color:#222">—</div>';
+    mapEl.insertBefore(filler, mapEl.firstChild);
+  }
+});
+
+// build table rows
+const tbody=document.getElementById('shelf-table');
+for(let i=0;i<TOTAL_SLOTS;i++){
+  const tr=document.createElement('tr');
+  tr.id=`tr-${i}`;
+  tr.innerHTML=`<td>${SLOT_LABELS[i]}</td>`
+    +`<td class="td-cubes"      id="tc-${i}">0</td>`
+    +`<td class="td-cylinders"  id="ty-${i}">0</td>`
+    +`<td class="td-chips"      id="tch-${i}">0</td>`
+    +`<td class="td-bottle"     id="tbo-${i}">0</td>`
+    +`<td class="td-cups"       id="tcu-${i}">0</td>`
+    +`<td class="td-small_cups" id="tsc-${i}">0</td>`
+    +`<td class="td-tin_can"    id="ttn-${i}">0</td>`
+    +`<td id="tt-${i}">0</td>`
+    +`<td class="td-bar"><div class="mini-bar-bg"><div class="mini-bar-fill" id="tb-${i}" style="width:0%"></div></div></td>`;
+  tbody.appendChild(tr);
+}
+
+function updateUI(){
+  // Each class counted strictly by its own label — cylinders does NOT include bottle/cups/small_cups/tin can
+  let totalCubes=0, totalCyls=0;
+  const classCounts={cubes:0,cylinders:0,chips:0,bottle:0,cups:0,small_cups:0,'tin can':0};
+
+  for(let col=0;col<COLS;col++){
+    for(let row=0;row<COL_SHELF_COUNTS[col];row++){
+      const items=slotState[col][row];
+      const cubes=items.filter(v=>v==='cubes').length;
+      const cyls =items.filter(v=>v==='cylinders').length;
+      totalCubes+=cubes; totalCyls+=cyls;
+      items.forEach(v=>{ if(classCounts[v]!==undefined) classCounts[v]++; });
+      const idx=flatIdx(col,row);
+      const pipsEl=document.getElementById(`pips-${col}-${row}`);
+      if(pipsEl) pipsEl.innerHTML=items.map(c=>{
+        const safe=c.replace(' ','_');
+        return `<span class="pip ${safe}"></span>`;
+      }).join('');
+      const cntEl=document.getElementById(`cnt-${col}-${row}`);
+      if(cntEl) cntEl.textContent=`${items.length}/${MAX_PER_SLOT}`;
+      const tc=document.getElementById(`tc-${idx}`);
+      const ty=document.getElementById(`ty-${idx}`);
+      const tt=document.getElementById(`tt-${idx}`);
+      const tb=document.getElementById(`tb-${idx}`);
+      if(tc) tc.textContent=cubes;
+      if(ty) ty.textContent=cyls;
+      if(tt) tt.textContent=items.length;
+      if(tb) tb.style.width=`${(items.length/MAX_PER_SLOT)*100}%`;
+      const slotClass={chips:0,bottle:0,cups:0,small_cups:0,'tin can':0};
+      items.forEach(v=>{ if(slotClass[v]!==undefined) slotClass[v]++; });
+      const cellMap={chips:`tch-${idx}`,bottle:`tbo-${idx}`,cups:`tcu-${idx}`,small_cups:`tsc-${idx}`,'tin can':`ttn-${idx}`};
+      Object.entries(cellMap).forEach(([cls,id])=>{
+        const el=document.getElementById(id);
+        if(el) el.textContent=slotClass[cls]||0;
+      });
+    }
+  }
+
+  // total = every item regardless of class
+  const total=Object.values(classCounts).reduce((a,b)=>a+b,0);
+  const pct=Math.round(total/MAX_CAPACITY*100);
+  document.getElementById('d-cubes').textContent=totalCubes;
+  document.getElementById('d-cylinders').textContent=totalCyls;
+  document.getElementById('d-total').textContent=total;
+  document.getElementById('d-pct').textContent=pct+'%';
+  document.getElementById('d-capbar').style.width=pct+'%';
+  const statMap={'chips':'d-chips','bottle':'d-bottle','cups':'d-cups','small_cups':'d-small_cups','tin can':'d-tin_can'};
+  Object.entries(statMap).forEach(([cls,id])=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=classCounts[cls]||0;
+  });
+
+  drawChart();
+}
+
+// mini bar chart — each class rendered as its own colour band, no CLASS_BASE grouping
+function drawChart(){
+  const canvas=document.getElementById('chart-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth*devicePixelRatio;
+  canvas.height=canvas.offsetHeight*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  const W=canvas.offsetWidth,H=canvas.offsetHeight;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H);
+
+  const labels=SLOT_LABELS;
+  const barW=Math.floor((W-40)/TOTAL_SLOTS)-4;
+  const maxH=H-28;
+
+  // Stacking order bottom→top, one colour per class
+  const STACK=[
+    {cls:'cylinders',  col:'#d5913a'},
+    {cls:'cubes',      col:'#3a7bd5'},
+    {cls:'chips',      col:'#ffcc00'},
+    {cls:'bottle',     col:'#44bb66'},
+    {cls:'cups',       col:'#c8864a'},
+    {cls:'small_cups', col:'#e8e8e8'},
+    {cls:'tin can',    col:'#aabbcc'},
+  ];
+
+  labels.forEach((lbl,i)=>{
+    let col=0,row=0,found=false;
+    for(let c=0;c<COLS&&!found;c++){for(let r=0;r<COL_SHELF_COUNTS[c]&&!found;r++){if(flatIdx(c,r)===i){col=c;row=r;found=true;}}}
+    const items=slotState[col][row];
+    const total=items.length;
+    const x=20+i*(barW+4);
+    const barH=Math.round((total/MAX_PER_SLOT)*maxH);
+
+    ctx.fillStyle='#1a1a1a';
+    ctx.fillRect(x,H-24-maxH,barW,maxH);
+
+    let yOffset=0;
+    STACK.forEach(({cls,col:colour})=>{
+      const count=items.filter(v=>v===cls).length;
+      if(count<=0) return;
+      const segH=Math.round((count/MAX_PER_SLOT)*maxH);
+      ctx.fillStyle=colour;
+      ctx.fillRect(x,H-24-yOffset-segH,barW,segH);
+      yOffset+=segH;
+    });
+
+    ctx.fillStyle='#444';
+    ctx.font=`9px Courier New`;
+    ctx.textAlign='center';
+    ctx.fillText(lbl,x+barW/2,H-10);
+
+    if(total>0){
+      ctx.fillStyle='#666';
+      ctx.fillText(total,x+barW/2,H-24-barH-4);
+    }
+  });
+
+  ctx.strokeStyle='#222'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(18,4); ctx.lineTo(18,H-22); ctx.stroke();
+}
+
+// event log
+const logEl=document.getElementById('log-box');
+function addLog(msg,type=''){
+  const line=document.createElement('div');
+  line.className=`log-line ${type}`;
+  const t=new Date().toTimeString().slice(0,8);
+  line.textContent=`[${t}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop=logEl.scrollHeight;
+  // keep max 60 lines
+  while(logEl.children.length>60) logEl.removeChild(logEl.firstChild);
+}
+
+function resetItems(){
+  for(let c=0;c<COLS;c++) for(let r=0;r<COL_SHELF_COUNTS[c];r++) setSlot(c,r,[]);
+  addLog('cleared all slots','warn');
+}
+
+// fillRandom() — all 7 classes matching data.yaml
+function fillRandom(){
+  const allClasses = ['cubes','cylinders','chips','bottle','cups','small_cups','tin can'];
+  for(let c=0;c<COLS;c++) for(let r=0;r<COL_SHELF_COUNTS[c];r++){
+    const n=Math.floor(Math.random()*(MAX_PER_SLOT+1));
+    const items=Array.from({length:n},()=>allClasses[Math.floor(Math.random()*allClasses.length)]);
+    setSlot(c,r,items);
+  }
+  addLog('randomized inventory (all 7 classes)');
+}
+
+
+// =============================================================================
+// WEIGHT CROSS-VERIFICATION
+// =============================================================================
+const CLASS_WEIGHTS_KG = {
+  bottle:     0.350,
+  chips:      0.120,
+  cubes:      0.080,
+  cups:       0.050,
+  cylinders:  0.200,
+  small_cups: 0.030,
+  'tin can':  0.400,
+};
+
+function renderVerification(v) {
+  if (!v || !v.shelf) return;
+
+  const status = v.status || 'pending';
+  const badge  = document.getElementById('verify-badge');
+  badge.textContent = status.toUpperCase();
+  badge.className   = status;
+
+  document.getElementById('verify-shelf-label').textContent = 'last checked — shelf ' + v.shelf;
+  document.getElementById('vr-shelf').textContent   = v.shelf;
+  document.getElementById('vr-count').textContent   = v.yolo_count != null ? v.yolo_count + ' objects' : '—';
+  document.getElementById('vr-expected').textContent = v.yolo_weight_expected_kg != null ? v.yolo_weight_expected_kg.toFixed(3) + ' kg' : '—';
+  document.getElementById('vr-sensor').textContent  = v.sensor_weight_kg != null ? v.sensor_weight_kg.toFixed(3) + ' kg' : '—';
+
+  const tol   = v.tolerance_kg != null ? v.tolerance_kg : 0.05;
+  const delta = v.delta_kg != null ? v.delta_kg : null;
+  const deltaEl = document.getElementById('vr-delta');
+  if (delta != null) {
+    deltaEl.textContent = delta.toFixed(4) + ' kg';
+    deltaEl.className   = 'vr-value ' + (delta <= tol ? 'ok' : 'bad');
+  }
+  document.getElementById('vr-tol').textContent  = '± ' + tol.toFixed(3) + ' kg';
+  document.getElementById('vr-time').textContent = v.timestamp || '—';
+
+  // Build per-class breakdown from current slot state for this shelf
+  const shelfKey = v.shelf;  // e.g. "A"
+  // Map shelf letter to col,row
+  const shelfToSlot = {A:[0,0],B:[1,0],C:[1,1],D:[2,0],E:[2,1],F:[3,0],G:[3,1]};
+  const slotCoords  = shelfToSlot[shelfKey];
+  const items = slotCoords ? slotState[slotCoords[0]][slotCoords[1]] : [];
+
+  // Count per class
+  const counts = {};
+  for (const item of items) counts[item] = (counts[item] || 0) + 1;
+
+  const tbody = document.getElementById('wt-tbody');
+  tbody.innerHTML = '';
+  let yoloTotal = 0;
+
+  for (const [cls, cnt] of Object.entries(counts)) {
+    if (!cnt) continue;
+    const unitW = CLASS_WEIGHTS_KG[cls] || 0;
+    const sub   = cnt * unitW;
+    yoloTotal  += sub;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${cls}</td><td>${cnt}</td><td>${unitW.toFixed(3)}</td><td>${sub.toFixed(3)}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  // Summary comparison row
+  const sensorW = v.sensor_weight_kg != null ? v.sensor_weight_kg : 0;
+  const matched = Math.abs(sensorW - yoloTotal) <= tol;
+  const summaryTr = document.createElement('tr');
+  summaryTr.className = 'wt-summary';
+  summaryTr.innerHTML = `
+    <td colspan="3" style="color:#444">yolo total vs sensor</td>
+    <td class="${matched ? 'ok' : 'bad'}">${yoloTotal.toFixed(3)} / ${sensorW.toFixed(3)}</td>
+  `;
+  tbody.appendChild(summaryTr);
+
+  // Update shelf cell verify badge
+  const cellEl = document.getElementById('smap-cell-' + shelfKey);
+  if (cellEl) {
+    const vSpan = cellEl.querySelector('.cell-verify');
+    if (vSpan) {
+      vSpan.className   = 'cell-verify ' + status;
+      vSpan.textContent = status === 'confirmed' ? '✓ OK' : '✗ WT';
+    }
+    // flash border
+    cellEl.style.borderColor = status === 'confirmed' ? '#00ff88' : '#ff4444';
+    setTimeout(() => { cellEl.style.borderColor = ''; }, 4000);
+  }
+
+  addLog('weight verify shelf ' + shelfKey + ' → ' + status.toUpperCase() +
+         ' | expected ' + yoloTotal.toFixed(3) + 'kg sensor ' + sensorW.toFixed(3) + 'kg',
+         status === 'confirmed' ? 'new' : 'warn');
+}
+
+// =============================================================================
+// WEBSOCKET
+// =============================================================================
+const WS_URL = `ws://${location.host}/ws`;
+let ws=null,wsKeepAlive;
+
+function connectWS(){
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{
+    document.getElementById('ws-status').className='online';
+    document.getElementById('ws-label').textContent='CONNECTED';
+    addLog('websocket connected to backend','new');
+    wsKeepAlive=setInterval(()=>ws&&ws.readyState===1&&ws.send('ping'),20000);
+  };
+  ws.onmessage=e=>{
+    if(e.data==='pong') return;
+    try{
+      const msg=JSON.parse(e.data);
+      // items array may contain any of the 7 data.yaml classes — all handled
+      if(msg.type==='inventory'){
+        msg.slots.forEach(({col,row,items})=>setSlot(col,row,items));
+        addLog(`received update: ${msg.slots.length} slots`);
+        // render verification if bundled with inventory
+        if(msg.verification && msg.verification.shelf) renderVerification(msg.verification);
+      } else if(msg.type==='verification_only'){
+        // mismatch — update verify panel only, do NOT touch slot items
+        if(msg.verification) renderVerification(msg.verification);
+      } else if(msg.type==='sensor'){
+        applySensorMsg(msg);
+      } else if(msg.type==='sensors' && Array.isArray(msg.data)){
+        msg.data.forEach(applySensorMsg);
+      }
+    }catch(err){addLog('bad message from backend','err');}
+  };
+  ws.onclose=()=>{
+    document.getElementById('ws-status').className='';
+    document.getElementById('ws-label').textContent='DISCONNECTED';
+    addLog('websocket disconnected — retrying in 3s...','err');
+    clearInterval(wsKeepAlive);
+    setTimeout(connectWS,3000);
+  };
+  ws.onerror=()=>ws.close();
+}
+connectWS();
+
+// =============================================================================
+// COLLAPSIBLE SECTION TOGGLE
+// =============================================================================
+function toggleSection(bodyId, arrowId) {
+  const body  = document.getElementById(bodyId);
+  const arrow = document.getElementById(arrowId);
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display  = open ? 'block' : 'none';
+  if (arrow) arrow.textContent = open ? '▼' : '▶';
+  if (open && bodyId === 'chart-body') drawChart(); // re-draw when revealed
+}
+
+// clock
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);},1000);
+document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);
+
+addLog('system started — classes: cubes, cylinders, chips, bottle, cups, small_cups, tin can');
+updateUI();
+
+// =============================================================================
+// SENSOR MODULE — HX711 Weight + IR Proximity (Shelves A, B, C)
+// =============================================================================
+const SHELF_IDS = ['A','B','C'];
+const WT_MAX_KG = 5.0;   // physical max of load cell
+
+const sensorState = {
+  A: { weight: 0,     ir: false, live: false },
+  B: { weight: 0,     ir: false, live: false },
+  C: { weight: 0.099, ir: true,  live: false, static: true }, // static 99g + IR blocked
+};
+
+function updateSensorUI(shelf) {
+  const s     = sensorState[shelf];
+  const orb   = document.getElementById(`ir-orb-${shelf}`);
+  const txt   = document.getElementById(`ir-text-${shelf}`);
+  const card  = document.getElementById(`sensor-card-${shelf}`);
+  const val   = document.getElementById(`wt-val-${shelf}`);
+  const bar   = document.getElementById(`wt-bar-${shelf}`);
+  const badge = document.getElementById(`sensor-badge-${shelf}`);
+
+  const irClass = s.ir ? 'blocked' : 'clear';
+  orb.className = `ir-orb ${irClass}`;
+  txt.className = `ir-status-text ${irClass}`;
+  txt.textContent = s.ir ? 'OBJ' : 'CLEAR';
+  card.className = `shelf-sensor-card ${s.ir ? 'occupied' : 'empty'}`;
+
+  const kg  = Math.max(0, s.weight);
+  const pct = Math.min(100, (kg / WT_MAX_KG) * 100);
+  // display in grams if under 1kg for readability, else kg
+  val.textContent = kg < 1 ? (kg * 1000).toFixed(0) + '' : kg.toFixed(3);
+  // unit label handled in HTML as 'kg' — update dynamically
+  const unitEl = val.nextElementSibling;
+  if (unitEl) unitEl.textContent = kg < 1 ? 'g' : 'kg';
+  val.className = `weight-value${s.weight > WT_MAX_KG * 0.75 ? ' heavy' : ''}`;
+  bar.style.width = pct + '%';
+
+  badge.textContent = s.live ? 'LIVE' : 'SIM';
+  badge.className   = `sensor-badge${s.live ? ' live' : ''}`;
+}
+
+function applySensorMsg(msg) {
+  const shelf = msg.shelf ? msg.shelf.toUpperCase() : null;
+  if (!SHELF_IDS.includes(shelf)) return;
+  if (sensorState[shelf].static) return; // Shelf C is locked to static 99g
+  if (msg.weight_kg  !== undefined) sensorState[shelf].weight = parseFloat(msg.weight_kg);
+  if (msg.ir_blocked !== undefined) sensorState[shelf].ir     = !!msg.ir_blocked;
+  sensorState[shelf].live = true;
+  updateSensorUI(shelf);
+}
+
+// Simulation: realistic values — objects barely reach 500g, typically 50–300g range
+// No simulation — sensors show 0 until real ESP32 data arrives
+SHELF_IDS.forEach(shelf => updateSensorUI(shelf));
+addLog('sensor module ready — shelves A B C (hx711 + ir) — awaiting ESP32');
+</script>
+</body>
+</html>
